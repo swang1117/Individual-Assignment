@@ -1,6 +1,10 @@
 pandas
 numpy
 nltk
+re
+spacy
+pickle
+os
 streamlit
 plotly
 matplotlib
