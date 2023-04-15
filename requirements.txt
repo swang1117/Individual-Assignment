@@ -1,0 +1,12 @@
+pandas
+numpy
+nltk
+streamlit
+plotly
+matplotlib
+wordcloud
+PIL
+gcsfs
+fsspec
+google-cloud-storage
+scikit-learn
