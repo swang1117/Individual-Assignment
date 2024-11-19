@@ -18,8 +18,11 @@ import plotly.express as px
 import matplotlib.pyplot as plt
 from wordcloud import WordCloud, ImageColorGenerator
 from PIL import Image, ImageOps
+import nltk
 
-
+# Ensure stopwords are downloaded
+nltk.download('stopwords')
+nltk.download('punkt')
 
 st.set_page_config(page_title="Rating Analyzer", layout="wide")
 st.title("Rating Analyzer")
