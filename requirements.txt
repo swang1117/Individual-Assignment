@@ -10,3 +10,4 @@ gcsfs
 fsspec
 google-cloud-storage
 scikit-learn
+streamlit-echarts
