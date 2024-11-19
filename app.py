@@ -144,7 +144,6 @@ test_f1_score = None
 
 with model_perf:
     class TextPreprocessor(TransformerMixin, BaseEstimator):
-        
         def __init__(self):
             self.lemmatizer = WordNetLemmatizer()
             
@@ -154,35 +153,61 @@ with model_perf:
         def transform(self, X, y=None):
             if isinstance(X, list):
                 X = pd.Series(X)
+    
+            processed = []
+            for text in X:
+                # Convert to lowercase and remove special characters
+                text = re.sub('[^a-zA-Z0-9\s]', '', str(text).lower())
+                
+                # Tokenize
+                tokens = word_tokenize(text)
+                
+                # Remove stopwords
+                tokens = [w for w in tokens if w not in stopwords.words('english')]
+                
+                # POS tagging and NE chunking (if needed)
+                tagged = pos_tag(tokens)
+                
+                # Lemmatization
+                lemmatized = [self.lemmatizer.lemmatize(w) for w, _ in tagged]
+                
+                # Join back into text
+                processed.append(' '.join(lemmatized))
+                
+            return pd.Series(processed)
+            
+    if 'model_perf' in locals():
+        with model_perf:
+            if st.button('Build My Machine Learning Model'):
+                # Data preprocessing
+                test_X = test.loc[:, ['benefits_review', 'side_effects_review', 'comments_review']].fillna("")
+                test_X = test_X.map(str)  # Using .map() instead of .applymap()
+                test_X = test_X.apply(lambda x: ' '.join(x), axis=1)
+                
+                test_y = test.rating
+                
+                pipeline = Pipeline([
+                    ('preprocessor', TextPreprocessor()),
+                    ('vect', TfidfVectorizer(ngram_range=(1, 2))),
+                    ('cls', LinearSVC(max_iter=12000))
+                ])
+                
+                try:
+                    pipeline.fit(test_X, test_y)
+                    y_pred = pipeline.predict(test_X)
+                    accuracy = metrics.accuracy_score(test_y, y_pred)
+                    test_f1_score = metrics.f1_score(test_y, y_pred, pos_label='positive')
+                    
+                    with open('pipeline.pkl', 'wb') as f:
+                        pickle.dump(pipeline, f)
+                        
+                    st.success("Model built successfully!")
+                    st.write("Test accuracy:", accuracy)
+                    st.write("F1 score:", test_f1_score)
+                    
+                except Exception as e:
+                    st.error(f"An error occurred while building the model: {str(e)}")
 
-            X = X.apply(lambda x: re.sub('[^a-z0-9]', ' ', x))
-            X = X.apply(lambda x: word_tokenize(x))
-            X = X.apply(lambda x: [w for w in x if w not in stopwords.words('english')])
-            X = X.apply(lambda x: pos_tag(x))
-            X = X.apply(lambda x: ne_chunk(x))
-            X = X.apply(lambda x: [self.lemmatizer.lemmatize(w) if not isinstance(w, Tree) else w for w, t in x])
-            X = X.apply(lambda x: ' '.join(x))
-            return X
-
-    if st.button('Build My Machine Learning Model'):
-        # Replace NaN values with an empty string and ensure all values are strings
-        test_X = test.loc[:, ['benefits_review', 'side_effects_review', 'comments_review']].fillna("")
-        test_X = test_X.applymap(str)  # Convert all values to strings
-        test_X = test_X.apply(lambda x: ' '.join(x), axis=1)  # Concatenate text from columns
-
-        test_y = test.rating
-        pipeline = Pipeline([
-        ('preprocessor', TextPreprocessor()),
-        ('vect', TfidfVectorizer(ngram_range = (1, 2))),
-        ('cls', LinearSVC(max_iter = 12000))
-    ])
-        pipeline.fit(test_X, test_y)
-        y_pred = pipeline.predict(test_X)
-        accuracy = metrics.accuracy_score(test_y, y_pred)
-        test_f1_score = metrics.f1_score(test_y, y_pred, pos_label='positive')
-        
-        with open('pipeline.pkl', 'wb') as f:
-            pickle.dump(pipeline, f) 
 
     st.subheader('Model Performence')
 
