@@ -149,49 +149,44 @@ with model_perf:
     class TextPreprocessor(TransformerMixin, BaseEstimator):
         def __init__(self):
             self.lemmatizer = WordNetLemmatizer()
+            self.stop_words = set(stopwords.words('english'))
             
         def fit(self, X, y=None):
             return self
-        
+            
         def transform(self, X, y=None):
             if isinstance(X, list):
                 X = pd.Series(X)
-
-            def process_text(text):
-                # Convert to lowercase and remove special characters
-                text = re.sub('[^a-z0-9]', ' ', str(text).lower())
-                # Tokenize
-                tokens = word_tokenize(text)
-                # Remove stopwords
-                tokens = [w for w in tokens if w not in stopwords.words('english')]
-                # POS tagging
-                tagged = pos_tag(tokens)
-                # NER
-                chunks = ne_chunk(tagged)
-                # Lemmatization
-                processed = []
-                for chunk in chunks:
-                    if isinstance(chunk, Tree):
-                        processed.append('_'.join([token for token, pos in chunk.leaves()]))
-                    else:
-                        word, tag = chunk
-                        processed.append(self.lemmatizer.lemmatize(word))
-                return ' '.join(processed)
                 
-            return X.apply(process_text)
+            def preprocess_text(text):
+                # Convert to lowercase and remove special characters
+                text = str(text).lower()
+                text = re.sub(r'[^a-zA-Z\s]', ' ', text)
+                
+                # Simple word tokenization
+                words = text.split()
+                
+                # Remove stopwords and lemmatize
+                words = [self.lemmatizer.lemmatize(word) 
+                        for word in words 
+                        if word not in self.stop_words and len(word) > 2]
+                
+                return ' '.join(words)
+            
+            return X.apply(preprocess_text)
 
     if st.button('Build My Machine Learning Model'):
         try:
-            # UPDATED THIS SECTION
+            # Process input data
             test_X = test[['benefits_review', 'side_effects_review', 'comments_review']].fillna("")
             test_X = test_X.astype(str)  # Changed from applymap to astype
             test_X = test_X.apply(lambda x: ' '.join(x), axis=1)
-
+            
             test_y = test.rating
             
             pipeline = Pipeline([
                 ('preprocessor', TextPreprocessor()),
-                ('vect', TfidfVectorizer(ngram_range=(1, 2))),
+                ('vect', TfidfVectorizer(ngram_range=(1, 2), min_df=2)),
                 ('cls', LinearSVC(max_iter=12000))
             ])
             
@@ -200,6 +195,7 @@ with model_perf:
             accuracy = metrics.accuracy_score(test_y, y_pred)
             test_f1_score = metrics.f1_score(test_y, y_pred, pos_label='positive')
             
+            # Save the model
             with open('pipeline.pkl', 'wb') as f:
                 pickle.dump(pipeline, f)
             
@@ -209,7 +205,8 @@ with model_perf:
             
         except Exception as e:
             st.error(f"An error occurred while building the model: {str(e)}")
-
+            st.write("Error details:", str(e))
+            
     st.subheader('Model Performance')
     if accuracy and test_f1_score:
         st.write("Test accuracy:", accuracy)
