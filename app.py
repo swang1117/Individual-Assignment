@@ -162,8 +162,11 @@ with model_perf:
             return X
 
     if st.button('Build My Machine Learning Model'):
-        test_X = test.loc[:, ('benefits_review', 'side_effects_review', 'comments_review')]
-        test_X = test_X.apply(lambda x: ' '.join(x), axis=1)
+        # Replace NaN values with an empty string and ensure all values are strings
+        test_X = test.loc[:, ['benefits_review', 'side_effects_review', 'comments_review']].fillna("")
+        test_X = test_X.applymap(str)  # Convert all values to strings
+        test_X = test_X.apply(lambda x: ' '.join(x), axis=1)  # Concatenate text from columns
+
         test_y = test.rating
         pipeline = Pipeline([
         ('preprocessor', TextPreprocessor()),
