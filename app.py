@@ -94,10 +94,15 @@ with model_sample:
     "---"
     st.subheader("Histogram of Ratings")
     rating_value_counts = test['rating'].value_counts().reset_index()
+    rating_value_counts.columns = ['rating', 'count']  # Rename columns for clarity
     colors = px.colors.qualitative.Plotly
-    fig = px.bar(rating_value_counts, x='index', y='rating',
-                 labels={'index': 'Rating', 'rating': 'Frequency'},
-                 color_discrete_sequence=colors)
+    fig = px.bar(
+        rating_value_counts,
+        x='rating',  # Correct column name
+        y='count',   # Correct column name
+        labels={'rating': 'Rating', 'count': 'Frequency'},
+        color_discrete_sequence=colors
+    )
     fig.update_traces(texttemplate='%{y}', textposition='outside', textfont={'size': 12})
     st.plotly_chart(fig)
 
