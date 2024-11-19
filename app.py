@@ -22,7 +22,10 @@ import nltk
 
 # Ensure stopwords are downloaded
 nltk.download('stopwords')
-nltk.download('punkt')
+nltk.download('averaged_perceptron_tagger')
+nltk.download('maxent_ne_chunker')
+nltk.download('words')
+nltk.download('wordnet')
 
 st.set_page_config(page_title="Rating Analyzer", layout="wide")
 st.title("Rating Analyzer")
