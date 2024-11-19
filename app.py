@@ -20,8 +20,9 @@ from wordcloud import WordCloud, ImageColorGenerator
 from PIL import Image, ImageOps
 import nltk
 
-# Ensure stopwords are downloaded
+# Download all required NLTK data
 nltk.download('stopwords')
+nltk.download('punkt')
 nltk.download('averaged_perceptron_tagger')
 nltk.download('maxent_ne_chunker')
 nltk.download('words')
@@ -32,7 +33,6 @@ st.title("Rating Analyzer")
 data_into, model_sample, model_perf, model_test = st.tabs(["Data Introduction", "Model Sample", "Model Performance", "Model Testing"])
 
 with data_into:
-
     st.markdown("""
     <style>
     .custom-title {
@@ -73,7 +73,6 @@ with data_into:
     - After comparing Accuracy and F1 score, using all columns and SVM model to predict rating score gets the best performance.
     ''', unsafe_allow_html=True)
 
-
 with model_sample:
     test = pd.read_csv('test.csv')
     test.rating = np.where(test.rating > 7, 'positive', 'negative')
@@ -100,12 +99,12 @@ with model_sample:
     "---"
     st.subheader("Histogram of Ratings")
     rating_value_counts = test['rating'].value_counts().reset_index()
-    rating_value_counts.columns = ['rating', 'count']  # Rename columns for clarity
+    rating_value_counts.columns = ['rating', 'count']
     colors = px.colors.qualitative.Plotly
     fig = px.bar(
         rating_value_counts,
-        x='rating',  # Correct column name
-        y='count',   # Correct column name
+        x='rating',
+        y='count',
         labels={'rating': 'Rating', 'count': 'Frequency'},
         color_discrete_sequence=colors
     )
@@ -115,14 +114,19 @@ with model_sample:
     "---"
     st.subheader("Word Cloud")
 
-    # Replace NaN values with an empty string and ensure all values are strings
+    # Process positive reviews - UPDATED THIS SECTION
     test_pos = test.loc[test.rating == "positive", ["benefits_review", "side_effects_review", "comments_review"]].fillna("")
-    test_pos = test_pos.applymap(str)  # Convert all values to strings
-    test_pos_text = ' '.join(test_pos["benefits_review"].tolist() + test_pos["side_effects_review"].tolist() + test_pos["comments_review"].tolist())
+    test_pos = test_pos.astype(str)  # Changed from applymap to astype
+    test_pos_text = ' '.join(test_pos["benefits_review"].tolist() + 
+                            test_pos["side_effects_review"].tolist() + 
+                            test_pos["comments_review"].tolist())
     
+    # Process negative reviews - UPDATED THIS SECTION
     test_neg = test.loc[test.rating == "negative", ["benefits_review", "side_effects_review", "comments_review"]].fillna("")
-    test_neg = test_neg.applymap(str)  # Convert all values to strings
-    test_neg_text = ' '.join(test_neg["benefits_review"].tolist() + test_neg["side_effects_review"].tolist() + test_neg["comments_review"].tolist())
+    test_neg = test_neg.astype(str)  # Changed from applymap to astype
+    test_neg_text = ' '.join(test_neg["benefits_review"].tolist() + 
+                            test_neg["side_effects_review"].tolist() + 
+                            test_neg["comments_review"].tolist())
     
     # Generate word clouds
     stop_words_list = nltk.corpus.stopwords.words('english')
@@ -138,7 +142,6 @@ with model_sample:
         wc2.generate(test_neg_text)
         st.image(wc2.to_array(), caption="Negative Reviews Word Cloud")
 
-
 accuracy = None
 test_f1_score = None
 
@@ -153,67 +156,64 @@ with model_perf:
         def transform(self, X, y=None):
             if isinstance(X, list):
                 X = pd.Series(X)
-    
-            processed = []
-            for text in X:
+
+            def process_text(text):
                 # Convert to lowercase and remove special characters
-                text = re.sub('[^a-zA-Z0-9\s]', '', str(text).lower())
-                
+                text = re.sub('[^a-z0-9]', ' ', str(text).lower())
                 # Tokenize
                 tokens = word_tokenize(text)
-                
                 # Remove stopwords
                 tokens = [w for w in tokens if w not in stopwords.words('english')]
-                
-                # POS tagging and NE chunking (if needed)
+                # POS tagging
                 tagged = pos_tag(tokens)
-                
+                # NER
+                chunks = ne_chunk(tagged)
                 # Lemmatization
-                lemmatized = [self.lemmatizer.lemmatize(w) for w, _ in tagged]
+                processed = []
+                for chunk in chunks:
+                    if isinstance(chunk, Tree):
+                        processed.append('_'.join([token for token, pos in chunk.leaves()]))
+                    else:
+                        word, tag = chunk
+                        processed.append(self.lemmatizer.lemmatize(word))
+                return ' '.join(processed)
                 
-                # Join back into text
-                processed.append(' '.join(lemmatized))
-                
-            return pd.Series(processed)
+            return X.apply(process_text)
+
+    if st.button('Build My Machine Learning Model'):
+        try:
+            # UPDATED THIS SECTION
+            test_X = test[['benefits_review', 'side_effects_review', 'comments_review']].fillna("")
+            test_X = test_X.astype(str)  # Changed from applymap to astype
+            test_X = test_X.apply(lambda x: ' '.join(x), axis=1)
+
+            test_y = test.rating
             
-    if 'model_perf' in locals():
-        with model_perf:
-            if st.button('Build My Machine Learning Model'):
-                # Data preprocessing
-                test_X = test.loc[:, ['benefits_review', 'side_effects_review', 'comments_review']].fillna("")
-                test_X = test_X.map(str)  # Using .map() instead of .applymap()
-                test_X = test_X.apply(lambda x: ' '.join(x), axis=1)
-                
-                test_y = test.rating
-                
-                pipeline = Pipeline([
-                    ('preprocessor', TextPreprocessor()),
-                    ('vect', TfidfVectorizer(ngram_range=(1, 2))),
-                    ('cls', LinearSVC(max_iter=12000))
-                ])
-                
-                try:
-                    pipeline.fit(test_X, test_y)
-                    y_pred = pipeline.predict(test_X)
-                    accuracy = metrics.accuracy_score(test_y, y_pred)
-                    test_f1_score = metrics.f1_score(test_y, y_pred, pos_label='positive')
-                    
-                    with open('pipeline.pkl', 'wb') as f:
-                        pickle.dump(pipeline, f)
-                        
-                    st.success("Model built successfully!")
-                    st.write("Test accuracy:", accuracy)
-                    st.write("F1 score:", test_f1_score)
-                    
-                except Exception as e:
-                    st.error(f"An error occurred while building the model: {str(e)}")
+            pipeline = Pipeline([
+                ('preprocessor', TextPreprocessor()),
+                ('vect', TfidfVectorizer(ngram_range=(1, 2))),
+                ('cls', LinearSVC(max_iter=12000))
+            ])
+            
+            pipeline.fit(test_X, test_y)
+            y_pred = pipeline.predict(test_X)
+            accuracy = metrics.accuracy_score(test_y, y_pred)
+            test_f1_score = metrics.f1_score(test_y, y_pred, pos_label='positive')
+            
+            with open('pipeline.pkl', 'wb') as f:
+                pickle.dump(pipeline, f)
+            
+            st.success("Model built successfully!")
+            st.write("Test accuracy:", accuracy)
+            st.write("F1 score:", test_f1_score)
+            
+        except Exception as e:
+            st.error(f"An error occurred while building the model: {str(e)}")
 
-
-    st.subheader('Model Performence')
-
-    if accuracy and f1_score:
-        st.write("Test accuracy", accuracy)
-        st.write("F1 score ", test_f1_score)
+    st.subheader('Model Performance')
+    if accuracy and test_f1_score:
+        st.write("Test accuracy:", accuracy)
+        st.write("F1 score:", test_f1_score)
     else:
         st.write("Please build the model first.")
 
