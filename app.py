@@ -109,21 +109,26 @@ with model_sample:
     "---"
     st.subheader("Word Cloud")
 
-    test_pos = test.loc[test.rating == "positive", ["benefits_review", "side_effects_review", "comments_review"]]
+    # Replace NaN values with an empty string and ensure all values are strings
+    test_pos = test.loc[test.rating == "positive", ["benefits_review", "side_effects_review", "comments_review"]].fillna("")
+    test_pos = test_pos.applymap(str)  # Convert all values to strings
     test_pos_text = ' '.join(test_pos["benefits_review"].tolist() + test_pos["side_effects_review"].tolist() + test_pos["comments_review"].tolist())
-
-    test_neg = test.loc[test.rating == "negative", ["benefits_review", "side_effects_review", "comments_review"]]
+    
+    test_neg = test.loc[test.rating == "negative", ["benefits_review", "side_effects_review", "comments_review"]].fillna("")
+    test_neg = test_neg.applymap(str)  # Convert all values to strings
     test_neg_text = ' '.join(test_neg["benefits_review"].tolist() + test_neg["side_effects_review"].tolist() + test_neg["comments_review"].tolist())
     
-    stop_words_list=nltk.corpus.stopwords.words('english')
-
+    # Generate word clouds
+    stop_words_list = nltk.corpus.stopwords.words('english')
     col1, col2 = st.columns(2)
+    
     with col1:
-        wc1 = WordCloud(background_color=None, mode="RGBA", max_words=2000, stopwords = set(stop_words_list))
+        wc1 = WordCloud(background_color=None, mode="RGBA", max_words=2000, stopwords=set(stop_words_list))
         wc1.generate(test_pos_text)
         st.image(wc1.to_array(), caption="Positive Reviews Word Cloud")
+    
     with col2:
-        wc2 = WordCloud(background_color=None, mode="RGBA", max_words=2000, stopwords = set(stop_words_list))
+        wc2 = WordCloud(background_color=None, mode="RGBA", max_words=2000, stopwords=set(stop_words_list))
         wc2.generate(test_neg_text)
         st.image(wc2.to_array(), caption="Negative Reviews Word Cloud")
 
